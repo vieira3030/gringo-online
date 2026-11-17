@@ -4,419 +4,141 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gringo Online</title>
-<style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: #f4f1e8;
-    background: radial-gradient(ellipse at center, #1f7a4d 0%, #125a37 60%, #0b3d25 100%);
-    min-height: 100vh;
-  }
-  button {
-    font: inherit; border: none; border-radius: 8px; padding: 10px 16px; cursor: pointer;
-    background: #f2c14e; color: #2b1d00; font-weight: 700; box-shadow: 0 3px 0 #b8892a;
-  }
-  button:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8892a; }
-  button.secondary { background: #e8e4d8; color: #222; box-shadow: 0 3px 0 #a9a596; }
-  button.danger { background: #e2513b; color: #fff; box-shadow: 0 3px 0 #9c2d1c; }
-  button.active { background: #4ec3f2; box-shadow: 0 3px 0 #2a8bb8; }
-  button:disabled { opacity: .45; cursor: default; }
-  input {
-    font: inherit; padding: 10px 12px; border-radius: 8px; border: 2px solid #0b3d25; width: 100%;
-  }
-  .hidden { display: none !important; }
-
-  /* Entrada */
-  #lobbyForm {
-    max-width: 380px; margin: 10vh auto; background: rgba(0,0,0,.35); padding: 28px; border-radius: 16px;
-    display: flex; flex-direction: column; gap: 12px;
-  }
-  #lobbyForm h1 { margin: 0 0 4px; text-align: center; font-size: 42px; letter-spacing: 3px; }
-  #lobbyForm p { margin: 0; opacity: .8; text-align: center; font-size: 14px; }
-  .row { display: flex; gap: 8px; }
-  #joinError { color: #ffb4a6; min-height: 1.2em; text-align: center; }
-
-  /* Jogo */
-  #game { display: grid; grid-template-columns: 1fr 280px; gap: 14px; padding: 14px; min-height: 100vh; }
-  @media (max-width: 900px) { #game { grid-template-columns: 1fr; } }
-  #topbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-  #topbar .code { font-size: 20px; font-weight: 800; letter-spacing: 2px; background: rgba(0,0,0,.3); padding: 6px 12px; border-radius: 8px; }
-  #status {
-    background: rgba(0,0,0,.4); border-radius: 10px; padding: 12px 16px; font-size: 17px; margin-bottom: 12px;
-    border-left: 6px solid #f2c14e;
-  }
-  #status.yourturn { border-left-color: #4ef28a; background: rgba(20,80,40,.7); }
-
-  #others { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-  .pbox { background: rgba(0,0,0,.25); border-radius: 12px; padding: 10px; border: 2px solid transparent; }
-  .pbox.turn { border-color: #4ef28a; box-shadow: 0 0 14px rgba(78,242,138,.5); }
-  .pbox.off { opacity: .45; }
-  .pname { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 6px; gap: 6px; }
-  .badge { font-size: 11px; padding: 2px 6px; border-radius: 6px; background: #f2c14e; color: #2b1d00; font-weight: 800; }
-  .badge.g { background: #e2513b; color: #fff; }
-  .hand { display: flex; flex-wrap: wrap; gap: 6px; }
-
-  .card {
-    width: 46px; height: 66px; border-radius: 6px; background: #fff; color: #111; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; font-weight: 800; box-shadow: 0 2px 4px rgba(0,0,0,.4); user-select: none;
-    position: relative;
-  }
-  .card .r { font-size: 18px; line-height: 1; }
-  .card .s { font-size: 20px; line-height: 1; }
-  .card .v { position: absolute; bottom: 2px; right: 4px; font-size: 10px; opacity: .6; }
-  .card.red { color: #c8102e; }
-  .card.back {
-    background: repeating-linear-gradient(45deg, #8e1b2c 0 6px, #b0283c 6px 12px); border: 3px solid #fff;
-  }
-  .card.empty { background: transparent; border: 2px dashed rgba(255,255,255,.25); box-shadow: none; }
-  .big .card { width: 78px; height: 112px; border-radius: 10px; }
-  .big .card .r { font-size: 30px; }
-  .big .card .s { font-size: 34px; }
-  .clickable { cursor: pointer; transition: transform .1s; }
-  .clickable:hover { transform: translateY(-6px); outline: 3px solid #f2c14e; }
-  .selected { outline: 3px solid #4ec3f2; transform: translateY(-6px); }
-
-  #table { display: flex; justify-content: center; align-items: flex-end; gap: 30px; margin: 22px 0; flex-wrap: wrap; }
-  .pile { text-align: center; font-size: 13px; opacity: .95; }
-  .pile .card { margin: 0 auto 6px; }
-
-  #mine { background: rgba(0,0,0,.3); border-radius: 14px; padding: 14px; }
-  #mine.turn { box-shadow: 0 0 18px rgba(78,242,138,.6); border: 2px solid #4ef28a; }
-  #mine h3 { margin: 0 0 10px; display: flex; gap: 10px; align-items: center; }
-  #myHand { gap: 12px; margin-bottom: 14px; }
-  #actions { display: flex; flex-wrap: wrap; gap: 10px; }
-
-  #side { display: flex; flex-direction: column; gap: 12px; }
-  .panel { background: rgba(0,0,0,.35); border-radius: 12px; padding: 12px; }
-  .panel h4 { margin: 0 0 8px; }
-  #log { font-size: 13px; display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow-y: auto; }
-  #log div { border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 3px; }
-  #rules { font-size: 13px; line-height: 1.45; }
-  #rules ul { margin: 4px 0; padding-left: 18px; }
-
-  #results table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-  #results td, #results th { padding: 6px; border-bottom: 1px solid rgba(255,255,255,.15); text-align: left; }
-  #results tr.win { background: rgba(242,193,78,.25); font-weight: 700; }
-
-  #toast {
-    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #222; color: #fff;
-    padding: 10px 18px; border-radius: 10px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 10;
-  }
-  #toast.show { opacity: 1; }
-  .flash { animation: flash .6s; }
-  @keyframes flash { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- Ecrã de entrada -->
-<div id="lobbyForm">
-  <h1>GRINGO</h1>
-  <p>Jogo de cartas online · 2 a 6 jogadores</p>
-  <input id="nameInput" maxlength="16" placeholder="O teu nome">
-  <button id="createBtn">Criar sala nova</button>
-  <div class="row">
-    <input id="codeInput" maxlength="4" placeholder="Código" style="text-transform:uppercase">
-    <button id="joinBtn" class="secondary">Entrar</button>
-  </div>
-  <div id="joinError"></div>
-</div>
-
-<!-- Jogo -->
-<div id="game" class="hidden">
-  <div>
-    <div id="topbar">
-      <span class="code" id="roomCode"></span>
-      <button class="secondary" id="copyBtn">Copiar link da sala</button>
-      <span id="roundInfo"></span>
+<!-- ========== ENTRADA ========== -->
+<div id="landing">
+  <div class="landing-card">
+    <div class="suits-deco"><span class="r">♥</span><span>♠</span><span class="r">♦</span><span>♣</span></div>
+    <h1>Gringo</h1>
+    <p class="sub">Jogo de cartas online · 2 a 6 jogadores</p>
+    <label class="field">
+      <span>O teu nome</span>
+      <input id="nameInput" maxlength="16" placeholder="Ex.: André" autocomplete="off">
+    </label>
+    <button id="createBtn" class="btn primary lg">Criar sala nova</button>
+    <div class="divider"><span>ou entra numa sala</span></div>
+    <div class="row">
+      <input id="codeInput" maxlength="4" placeholder="CÓDIGO" class="code-input" autocomplete="off">
+      <button id="joinBtn" class="btn secondary">Entrar</button>
     </div>
-    <div id="status"></div>
-
-    <div id="results" class="panel hidden"></div>
-
-    <div id="others"></div>
-
-    <div id="table">
-      <div class="pile big">
-        <div id="deck"></div>
-        <div>Baralho (<span id="deckCount">0</span>)</div>
-      </div>
-      <div class="pile big">
-        <div id="discard"></div>
-        <div>Mesa (última jogada)</div>
-      </div>
-      <div class="pile big" id="drawnWrap">
-        <div id="drawn"></div>
-        <div id="drawnLabel">Carta tirada</div>
-      </div>
-    </div>
-
-    <div id="mine">
-      <h3><span id="myName"></span> <span id="myBadges"></span></h3>
-      <div class="hand big" id="myHand"></div>
-      <div id="actions"></div>
-    </div>
-  </div>
-
-  <div id="side">
-    <div class="panel">
-      <h4>Jogadores e pontos</h4>
-      <div id="scoreList"></div>
-    </div>
-    <div class="panel">
-      <h4>Jogadas</h4>
-      <div id="log"></div>
-    </div>
-    <div class="panel" id="rules">
-      <h4>Regras rápidas</h4>
-      Objetivo: ter <b>menos pontos</b>.
-      <ul>
-        <li>No início vês 2 das tuas 4 cartas — memoriza!</li>
-        <li>Na tua vez tira uma carta: troca-a por uma tua ou joga-a na mesa.</li>
-        <li>Quando alguém joga uma carta e tens uma igual, clica nela rápido para a jogar. Só uma pessoa consegue por jogada. Se te enganares, apanhas uma carta sem ver.</li>
-        <li><b>Gringo</b>: na tua vez, em vez de jogar. Os outros jogam mais uma vez e mostram-se as cartas.</li>
-        <li>Sem cartas = <b>Autogringo</b>.</li>
-      </ul>
-      Valores: A = 1 · 2–10 = valor · J, Q = 10 · K♥ K♦ = −3 · K♠ K♣ = 10
-    </div>
+    <div id="joinError" class="form-error"></div>
+    <button class="link-btn" data-open-rules>Como se joga?</button>
   </div>
 </div>
 
-<div id="toast"></div>
+<!-- ========== JOGO ========== -->
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="brand"><span class="brand-logo">♠</span>Gringo</div>
+    <div class="room-chip">
+      <span class="muted">Sala</span> <b id="roomCode">----</b>
+      <button id="copyBtn" class="chip-btn" title="Copiar link da sala">Copiar link</button>
+    </div>
+    <div class="spacer"></div>
+    <div id="roundInfo" class="round-info"></div>
+    <div id="conn" class="conn ok" title="Ligado ao servidor"><i></i><span>Ligado</span></div>
+    <button id="soundBtn" class="icon-btn" title="Som"></button>
+    <button class="icon-btn" data-open-rules title="Regras">?</button>
+  </header>
+
+  <div class="layout">
+    <main class="table-area">
+      <div id="opponents" class="opponents"></div>
+
+      <div class="felt">
+        <div id="lobbyPanel" class="lobby-panel hidden"></div>
+        <div id="piles" class="piles">
+          <div class="pile">
+            <div id="deck" class="pile-slot"></div>
+            <div class="pile-label">Baralho · <span id="deckCount">0</span></div>
+          </div>
+          <div class="pile">
+            <div id="discard" class="pile-slot"></div>
+            <div class="pile-label">Mesa</div>
+          </div>
+          <div class="pile" id="drawnPile">
+            <div id="drawn" class="pile-slot"></div>
+            <div class="pile-label" id="drawnLabel">Carta tirada</div>
+          </div>
+        </div>
+        <div id="gringoBanner" class="gringo-banner hidden"></div>
+      </div>
+
+      <div id="prompt" class="prompt"></div>
+
+      <section id="mySeat" class="my-seat">
+        <div class="seat-head">
+          <div id="myAvatar" class="avatar"></div>
+          <div>
+            <div class="seat-name" id="myName"></div>
+            <div class="seat-sub" id="mySub"></div>
+          </div>
+          <div class="spacer"></div>
+          <div id="myBadges" class="badges"></div>
+        </div>
+        <div id="myHand" class="hand mine"></div>
+        <div id="actions" class="actions"></div>
+      </section>
+    </main>
+
+    <aside class="sidebar">
+      <div class="panel">
+        <div class="panel-title">Classificação</div>
+        <div id="scoreList" class="score-list"></div>
+      </div>
+      <div class="panel grow">
+        <div class="panel-title">Atividade</div>
+        <div id="log" class="log"></div>
+      </div>
+      <div class="panel values">
+        <div class="panel-title">Valores</div>
+        <div class="values-grid">
+          <span>A</span><b>1</b>
+          <span>2–10</span><b>valor</b>
+          <span>J · Q</span><b>10</b>
+          <span class="red">K♥ K♦</span><b class="good">−3</b>
+          <span>K♠ K♣</span><b>10</b>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ========== AVISOS E JANELAS ========== -->
+<div id="toasts" class="toasts"></div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <button class="modal-close" id="modalClose" title="Fechar">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<template id="rulesTpl">
+  <h2>Como se joga o Gringo</h2>
+  <p class="lead">Objetivo: acabar a ronda com <b>menos pontos</b> possível.</p>
+  <div class="rules">
+    <div class="rule"><div class="rule-ico">👀</div><div><b>Início</b><br>Cada jogador recebe 4 cartas viradas para baixo e pode ver 2 à escolha. Memoriza-as!</div></div>
+    <div class="rule"><div class="rule-ico">🂠</div><div><b>Na tua vez</b><br>Tira uma carta do baralho (só tu a vês). Troca-a por uma das tuas ou joga-a na mesa.</div></div>
+    <div class="rule"><div class="rule-ico">🃏</div><div><b>Par</b><br>Se tiras uma carta e sabes que tens outra igual, podes jogar as duas de uma vez. Se te enganares, apanhas uma carta sem ver.</div></div>
+    <div class="rule"><div class="rule-ico">⚡</div><div><b>Carta igual</b><br>Quando alguém joga uma carta e tens uma igual, clica nela rápido para a jogar. Só passam duas cartas iguais por jogada. Se te enganares, apanhas uma carta sem ver.</div></div>
+    <div class="rule"><div class="rule-ico">♛</div><div><b>Dama (Q)</b> — tiras e jogas na mesa: podes ver uma das tuas cartas.</div></div>
+    <div class="rule"><div class="rule-ico">♞</div><div><b>Valete (J)</b> — tiras e jogas na mesa: trocas uma carta tua com uma de outro jogador, sem ver nenhuma das duas.</div></div>
+    <div class="rule"><div class="rule-ico">♚</div><div><b>Rei (K)</b> — tiras e jogas na mesa: vês uma carta de outro jogador e decides se a trocas por uma tua.</div></div>
+    <div class="rule"><div class="rule-ico">📣</div><div><b>Gringo</b><br>Na tua vez, em vez de jogar. As tuas cartas ficam bloqueadas, os outros jogam mais uma vez e mostram-se todas as cartas.</div></div>
+    <div class="rule"><div class="rule-ico">🏁</div><div><b>Autogringo</b><br>Se ficares sem cartas, acontece automaticamente.</div></div>
+  </div>
+  <div class="values-row">
+    <span>A = 1</span><span>2–10 = valor</span><span>J, Q = 10</span><span class="red">K♥ K♦ = −3</span><span>K♠ K♣ = 10</span>
+  </div>
+</template>
 
 <script src="/socket.io/socket.io.js"></script>
-<script>
-const socket = io();
-let state = null;
-let joined = null;      // { code, name }
-let peekSel = [];
-let snapMode = false;
-let lastDiscardKey = '';
-
-const $ = (id) => document.getElementById(id);
-const params = new URLSearchParams(location.search);
-$('nameInput').value = localStorage.getItem('gringo_name') || '';
-if (params.get('sala')) $('codeInput').value = params.get('sala').toUpperCase();
-
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove('show'), 2600);
-}
-
-function join(code) {
-  const name = $('nameInput').value.trim();
-  if (!name) { $('joinError').textContent = 'Escreve o teu nome.'; return; }
-  localStorage.setItem('gringo_name', name);
-  const token = code ? sessionStorage.getItem('gringo_' + code) : null;
-  socket.emit('join', { name, code, token }, (res) => {
-    if (res.error) { $('joinError').textContent = res.error; return; }
-    sessionStorage.setItem('gringo_' + res.code, res.token);
-    joined = { code: res.code, name };
-    history.replaceState(null, '', '?sala=' + res.code);
-    $('lobbyForm').classList.add('hidden');
-    $('game').classList.remove('hidden');
-  });
-}
-
-$('createBtn').onclick = () => join('');
-$('joinBtn').onclick = () => join($('codeInput').value.trim().toUpperCase());
-$('codeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
-$('copyBtn').onclick = () => {
-  const url = location.origin + '/?sala=' + joined.code;
-  navigator.clipboard.writeText(url).then(() => toast('Link copiado: ' + url), () => toast(url));
-};
-
-socket.on('connect', () => { if (joined) join(joined.code); });
-socket.on('toast', toast);
-socket.on('state', (s) => { state = s; render(); });
-
-const act = (type, extra = {}) => socket.emit('action', { type, ...extra });
-
-function cardEl(c) {
-  const d = document.createElement('div');
-  d.className = 'card';
-  if (!c) { d.classList.add('empty'); return d; }
-  if (c.hidden) { d.classList.add('back'); return d; }
-  if (c.suit === '♥' || c.suit === '♦') d.classList.add('red');
-  d.innerHTML = `<span class="r">${c.rank}</span><span class="s">${c.suit}</span>` +
-    (c.value !== undefined ? `<span class="v">${c.value}</span>` : '');
-  return d;
-}
-
-function button(label, onClick, cls = '') {
-  const b = document.createElement('button');
-  b.textContent = label;
-  b.className = cls;
-  b.onclick = onClick;
-  return b;
-}
-
-function render() {
-  const s = state;
-  const me = s.players[s.me];
-  const myTurn = s.phase === 'play' && s.turn === s.me;
-  const turnName = s.players[s.turn] ? s.players[s.turn].name : '';
-  const locked = s.gringoBy === s.me;
-  if (!(myTurn && s.drawn && s.snapOpen)) snapMode = false;
-  if (s.phase !== 'peek') peekSel = [];
-
-  $('roomCode').textContent = 'Sala ' + s.code;
-  $('roundInfo').textContent = s.round ? 'Ronda ' + s.round : '';
-
-  // Estado / instruções
-  let msg = '';
-  if (s.phase === 'lobby') {
-    msg = `À espera de jogadores (${s.players.length}/6). Partilha o código <b>${s.code}</b> ou o link da sala.`;
-    if (s.isHost) msg += ' Quando estiverem todos, carrega em <b>Começar jogo</b>.';
-    else msg += ' O anfitrião vai começar o jogo.';
-  } else if (s.phase === 'peek') {
-    const seen = me.hand.filter((c) => c && !c.hidden).length;
-    if (me.ready) msg = 'À espera que os outros memorizem as cartas...';
-    else if (seen === 2) msg = '👀 Memoriza estas 2 cartas e carrega em <b>Pronto</b>.';
-    else msg = 'Clica em <b>2 das tuas cartas</b> para as veres.';
-  } else if (s.phase === 'play') {
-    if (myTurn && !s.drawn) msg = '🟢 <b>A tua vez!</b> Clica no baralho para tirar uma carta' + (s.gringoBy === null ? ', ou diz <b>GRINGO</b>.' : '.');
-    else if (myTurn && s.drawn) msg = '🟢 Clica numa das tuas cartas para a <b>trocar</b>, ou <b>joga a carta tirada</b> na mesa.';
-    else msg = `Vez de <b>${turnName}</b>.`;
-    if (s.gringoBy !== null) msg += ` <br>📣 ${s.players[s.gringoBy].name} disse ${s.autogringo ? 'AUTOGRINGO' : 'GRINGO'} — faltam ${s.finalTurnsLeft} jogada(s).`;
-    if (s.snapOpen && s.discardTop && !locked && !(myTurn && s.drawn)) msg += `<br>⚡ Tens um <b>${s.discardTop.rank}</b>? Clica nele rápido!`;
-  } else if (s.phase === 'end') {
-    msg = 'Fim da ronda! Todas as cartas foram mostradas.' + (s.isHost ? ' Carrega em <b>Nova ronda</b> para continuar.' : ' À espera do anfitrião.');
-  }
-  $('status').innerHTML = msg;
-  $('status').classList.toggle('yourturn', myTurn);
-
-  // Resultados
-  const res = $('results');
-  if (s.phase === 'end' && s.results) {
-    res.classList.remove('hidden');
-    let html = '<h4>Resultado da ronda</h4><table><tr><th>Jogador</th><th>Ronda</th><th>Total</th></tr>';
-    s.players.forEach((p, i) => {
-      const win = s.results.winners.includes(i);
-      html += `<tr class="${win ? 'win' : ''}"><td>${win ? '🏆 ' : ''}${esc(p.name)}</td><td>${s.results.scores[i]}</td><td>${p.total}</td></tr>`;
-    });
-    res.innerHTML = html + '</table>';
-  } else res.classList.add('hidden');
-
-  // Outros jogadores
-  const others = $('others');
-  others.innerHTML = '';
-  s.players.forEach((p, i) => {
-    if (i === s.me) return;
-    const box = document.createElement('div');
-    box.className = 'pbox' + (s.phase === 'play' && s.turn === i ? ' turn' : '') + (p.connected ? '' : ' off');
-    const badges = [];
-    if (p.isHost) badges.push('<span class="badge">anfitrião</span>');
-    if (s.gringoBy === i) badges.push(`<span class="badge g">${s.autogringo ? 'AUTOGRINGO' : 'GRINGO'}</span>`);
-    if (s.phase === 'peek' && p.ready) badges.push('<span class="badge">pronto</span>');
-    if (!p.connected) badges.push('<span class="badge g">desligado</span>');
-    box.innerHTML = `<div class="pname"><span>${esc(p.name)}</span><span>${badges.join(' ')}</span></div>`;
-    const h = document.createElement('div');
-    h.className = 'hand';
-    p.hand.forEach((c) => h.appendChild(cardEl(c)));
-    box.appendChild(h);
-    others.appendChild(box);
-  });
-
-  // Mesa
-  $('deckCount').textContent = s.deckCount;
-  const deck = $('deck');
-  deck.innerHTML = '';
-  const deckCard = cardEl(s.phase === 'lobby' ? null : { hidden: true });
-  if (myTurn && !s.drawn) { deckCard.classList.add('clickable'); deckCard.onclick = () => act('draw'); }
-  deck.appendChild(deckCard);
-
-  const dis = $('discard');
-  dis.innerHTML = '';
-  const dEl = cardEl(s.discardTop);
-  const key = s.discardTop ? s.discardTop.rank + s.discardTop.suit + s.deckCount : '';
-  if (key && key !== lastDiscardKey) dEl.classList.add('flash');
-  lastDiscardKey = key;
-  dis.appendChild(dEl);
-
-  const drawnEl = $('drawn');
-  drawnEl.innerHTML = '';
-  $('drawnWrap').classList.toggle('hidden', !s.drawn);
-  if (s.drawn) {
-    drawnEl.appendChild(cardEl(s.drawn));
-    $('drawnLabel').textContent = myTurn ? 'A tua carta tirada' : `${turnName} está a decidir`;
-  }
-
-  // As minhas cartas
-  $('myName').textContent = me.name + ' (tu)';
-  $('mine').classList.toggle('turn', myTurn);
-  const mb = [];
-  if (me.isHost) mb.push('<span class="badge">anfitrião</span>');
-  if (locked) mb.push(`<span class="badge g">${s.autogringo ? 'AUTOGRINGO' : 'GRINGO'} — cartas bloqueadas</span>`);
-  $('myBadges').innerHTML = mb.join(' ');
-
-  const hand = $('myHand');
-  hand.innerHTML = '';
-  me.hand.forEach((c, i) => {
-    const el = cardEl(c);
-    if (c) {
-      if (s.phase === 'peek' && !me.ready && me.hand.filter((x) => x && !x.hidden).length < 2) {
-        el.classList.add('clickable');
-        if (peekSel.includes(i)) el.classList.add('selected');
-        el.onclick = () => {
-          if (peekSel.includes(i)) peekSel = peekSel.filter((x) => x !== i);
-          else if (peekSel.length < 2) peekSel.push(i);
-          if (peekSel.length === 2) act('peek', { slots: peekSel });
-          render();
-        };
-      } else if (s.phase === 'play' && !locked) {
-        if (myTurn && s.drawn && !snapMode) {
-          el.classList.add('clickable');
-          el.title = 'Trocar por esta carta';
-          el.onclick = () => act('swap', { slot: i });
-        } else if (s.snapOpen && s.discardTop) {
-          el.classList.add('clickable');
-          el.title = 'Jogar esta carta (igual à da mesa)';
-          el.onclick = () => { snapMode = false; act('snap', { slot: i }); };
-        }
-      }
-    }
-    hand.appendChild(el);
-  });
-
-  // Botões
-  const actions = $('actions');
-  actions.innerHTML = '';
-  if ((s.phase === 'lobby' || s.phase === 'end') && s.isHost) {
-    actions.appendChild(button(s.phase === 'lobby' ? 'Começar jogo' : 'Nova ronda',
-      () => act(s.phase === 'lobby' ? 'start' : 'newRound')));
-  }
-  if (s.phase === 'peek' && !me.ready && me.hand.filter((c) => c && !c.hidden).length === 2) {
-    actions.appendChild(button('Pronto, já memorizei', () => act('ready')));
-  }
-  if (myTurn && !s.drawn) {
-    actions.appendChild(button('Tirar carta', () => act('draw')));
-    if (s.gringoBy === null) actions.appendChild(button('📣 GRINGO!', () => act('gringo'), 'danger'));
-  }
-  if (myTurn && s.drawn) {
-    actions.appendChild(button('Jogar carta tirada na mesa', () => act('discard'), 'secondary'));
-    if (s.snapOpen && s.discardTop) {
-      actions.appendChild(button(snapMode ? '⚡ Modo carta igual (ativo)' : `⚡ Jogar carta igual (${s.discardTop.rank})`,
-        () => { snapMode = !snapMode; render(); }, snapMode ? 'active' : 'secondary'));
-    }
-  }
-
-  // Pontos
-  $('scoreList').innerHTML = s.players.map((p, i) =>
-    `<div>${i === s.turn && s.phase === 'play' ? '▶ ' : ''}${esc(p.name)}${i === s.me ? ' (tu)' : ''} — ${p.total} pts ${p.connected ? '' : '(desligado)'}</div>`
-  ).join('');
-
-  // Registo
-  const log = $('log');
-  log.innerHTML = s.log.map((l) => `<div>${esc(l)}</div>`).join('');
-  log.scrollTop = log.scrollHeight;
-}
-
-function esc(t) {
-  return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-</script>
+<script src="app.js"></script>
 </body>
 </html>
