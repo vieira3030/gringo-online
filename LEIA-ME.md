@@ -32,15 +32,22 @@ No plano gratuito, o servidor adormece quando não é usado e pode demorar cerca
 
 ## Regras implementadas
 
-- Cada jogador recebe 4 cartas viradas para baixo e escolhe 2 para ver e memorizar.
-- Na sua vez, tira uma carta do baralho (só ele a vê) e troca-a por uma das suas ou joga-a na mesa.
-- Quando é jogada uma carta na mesa, qualquer jogador com uma carta do mesmo valor pode clicar nela para a jogar. Só uma pessoa consegue por jogada, por isso só passam duas cartas iguais. Se te enganares, a carta é mostrada e apanhas uma carta do baralho sem a ver.
-- **Par**: se tiras uma carta e sabes que tens outra igual, podes jogar as duas. Se te enganares, apanhas uma carta sem ver.
-- **Dama (Q)**: se a tiras e a jogas na mesa, podes ver uma das tuas cartas.
-- **Valete (J)**: se o tiras e o jogas na mesa, trocas uma carta tua com uma de outro jogador, sem ninguém ver.
-- **Rei (K)**: se o tiras e o jogas na mesa, vês uma carta de outro jogador e decides se a trocas por uma tua.
-- **Gringo**: na tua vez, em vez de tirar carta. As tuas cartas ficam bloqueadas, os outros jogam mais uma vez e mostram-se todas as cartas.
-- **Autogringo**: acontece automaticamente quando ficas sem cartas.
-- Valores: A = 1, 2–10 = o próprio número, J e Q = 10, K♥ e K♦ = −3, K♠ e K♣ = 10.
+- Objetivo: ficar com menos pontos. A = 1, 2–10 = o próprio número, J, Q e K = 10, reis vermelhos (K♥ K♦) = −3.
+- Cada jogador recebe 4 cartas viradas para baixo e só pode ver 2 no início.
+- Na sua vez, tira uma carta do baralho (só ele a vê) e troca-a por uma das suas ou deita-a fora.
+- **Cobrir**: quando alguém deita fora uma carta (por ex. um 6) e sabes onde tens um 6, clicas nele e pões por cima. Ficas com menos uma carta.
+- **Só uma vez**: se outra pessoa cobrir a seguir, não vale — volta a ficar com a carta e apanha mais uma sem ver. O mesmo acontece se a carta que jogaste não for igual.
+- **Cobrir com a carta de outro**: se sabes que outro jogador tem um 6, clicas no 6 dele e depois numa carta tua. O 6 dele cobre a mesa e ele fica com a tua carta. Ficas com menos uma. Se não for um 6, apanhas uma carta sem ver.
+- **Par**: se tiras uma carta e sabes que tens outra igual, jogas as duas logo (uma cobre a outra).
+- **Valete (J)**: trocas uma carta com outro jogador, sem ninguém ver.
+- **Dama (Q)**: vês uma carta tua.
+- **Rei (K)**: vês uma carta de outro jogador e decides se a trocas por uma tua.
+- Os poderes só contam quando a figura é tirada do baralho e deitada fora.
+- **Gringo**: dito na tua vez. Joga-se mais uma volta (quem disse já não joga) e contam-se os pontos.
+- **Sem cartas**: se alguém ficar sem cartas, contam-se os pontos.
 - Ganha a ronda quem tiver menos pontos. Os pontos vão-se somando de ronda para ronda.
-- Se atualizares a página, voltas ao teu lugar na mesma sala.
+
+### Opções do anfitrião (na sala de espera)
+
+- **Pode-se cobrir a mesma carta várias vezes** (desligado por defeito).
+- **Quem fica sem cartas acaba logo a ronda** (desligado por defeito: os outros jogam mais uma vez).

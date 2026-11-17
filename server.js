@@ -86,6 +86,7 @@ function startRound(room) {
   room.drawn = null;
   room.pending = null;
   room.snapOpen = false;
+  room.covers = 0;
   room.gringoBy = null;
   room.autogringo = false;
   room.finalTurnsLeft = 0;
@@ -143,6 +144,10 @@ function declareGringo(room, idx, auto) {
   room.gringoBy = idx;
   room.autogringo = auto;
   room.finalTurnsLeft = room.players.filter((p, i) => i !== idx && p.connected).length;
+  if (auto && room.options.autoImmediate) {
+    event(room, 'auto', `${pname(room, idx)} ficou sem cartas: AUTOGRINGO! Contam-se os pontos.`, [], idx);
+    return endRound(room);
+  }
   event(room, auto ? 'auto' : 'gringo', auto
     ? `${pname(room, idx)} ficou sem cartas: AUTOGRINGO! Os outros jogam mais uma vez.`
     : `${pname(room, idx)} disse GRINGO! As cartas dele ficam bloqueadas. Os outros jogam mais uma vez.`, [], idx);
@@ -162,6 +167,20 @@ function endRound(room) {
   room.results = { scores, winners };
   event(room, 'end', `Fim da ronda! Ganhou ${winners.map((i) => pname(room, i)).join(' e ')} com ${min} pontos.`);
 }
+
+// Penalização: o jogador apanha uma carta do baralho sem a ver
+function penalize(room, idx) {
+  const p = room.players[idx];
+  const pen = drawFromDeck(room);
+  if (!pen) return null;
+  const empty = p.hand.indexOf(null);
+  const s = empty >= 0 ? empty : p.hand.length;
+  p.hand[s] = pen;
+  return { p: idx, s };
+}
+
+// Já alguém cobriu a carta da mesa e só se pode cobrir uma vez?
+const coverClosed = (room) => !room.options.multiCover && room.covers >= 1;
 
 // Cartas de outros jogadores que se podem escolher com o Valete ou o Rei
 function validTarget(room, idx, tp, ts) {
@@ -209,6 +228,8 @@ function view(room, me) {
     autogringo: room.autogringo,
     finalTurnsLeft: room.finalTurnsLeft,
     snapOpen: room.snapOpen,
+    covers: room.covers,
+    options: room.options,
     deckCount: room.deck.length,
     discardTop: room.discard.length ? room.discard[room.discard.length - 1] : null,
     discardCount: room.discard.length,
@@ -257,7 +278,10 @@ io.on('connection', (socket) => {
       room = {
         code, players: [], hostToken: null, phase: 'lobby', deck: [], discard: [], log: [],
         round: 0, dealer: -1, turn: 0, drawn: null, pending: null, snapOpen: false, gringoBy: null,
-        autogringo: false, finalTurnsLeft: 0, results: null, fxId: 0, fx: null,
+        autogringo: false, finalTurnsLeft: 0, results: null, fxId: 0, fx: null, covers: 0,
+        // multiCover: pode-se cobrir a mesma carta mais do que uma vez
+        // autoImmediate: quem fica sem cartas acaba logo a ronda (senão os outros jogam mais uma vez)
+        options: { multiCover: false, autoImmediate: false },
       };
       rooms.set(code, room);
     } else {
@@ -339,6 +363,7 @@ io.on('connection', (socket) => {
         p.hand[a.slot] = room.drawn;
         room.discard.push(old);
         room.snapOpen = true;
+        room.covers = 0;
         event(room, 'swap', `${p.name} trocou uma carta e jogou ${cardText(old)}.`, [{ p: idx, s: a.slot }], idx);
         finishTurn(room);
         break;
@@ -349,35 +374,30 @@ io.on('connection', (socket) => {
         room.drawn = null;
         room.discard.push(c);
         room.snapOpen = true;
+        room.covers = 0;
         event(room, 'discard', `${p.name} jogou ${cardText(c)} na mesa.`, [], idx);
         afterDrawnPlayed(room, idx, c);
         break;
       }
       case 'double': {
-        // Jogar a carta tirada junto com uma carta igual da mão
+        // Jogar a carta tirada junto com uma carta igual da mão (uma cobre a outra)
         if (!myTurn || !room.drawn || pend) return;
         if (!validSlot(a.slot)) return;
         const c = room.drawn;
         const mine = p.hand[a.slot];
         room.drawn = null;
+        room.snapOpen = true;
         if (mine.rank === c.rank) {
           p.hand[a.slot] = null;
-          room.discard.push(mine, c);
-          room.snapOpen = false; // já passaram duas cartas iguais
-          event(room, 'double', `${p.name} jogou um par: ${cardText(mine)} + ${cardText(c)}!`, [{ p: idx, s: a.slot }], idx);
+          room.discard.push(c, mine);
+          room.covers = 1; // já houve uma carta a cobrir
+          event(room, 'double', `${p.name} jogou um par: ${cardText(c)} + ${cardText(mine)}!`, [{ p: idx, s: a.slot }], idx);
           if (cardsLeft(p) === 0 && room.gringoBy === null) declareGringo(room, idx, true);
           afterDrawnPlayed(room, idx, c);
         } else {
           room.discard.push(c);
-          room.snapOpen = true;
-          const pen = drawFromDeck(room);
-          let cell = null;
-          if (pen) {
-            const empty = p.hand.indexOf(null);
-            const s = empty >= 0 ? empty : p.hand.length;
-            p.hand[s] = pen;
-            cell = { p: idx, s };
-          }
+          room.covers = 0;
+          const cell = penalize(room, idx);
           event(room, 'fail', `${p.name} tentou fazer par mas enganou-se (${cardText(mine)} ≠ ${c.rank}). Apanha uma carta sem ver.`,
             [{ p: idx, s: a.slot }].concat(cell ? [cell] : []), idx);
           finishTurn(room);
@@ -392,30 +412,74 @@ io.on('connection', (socket) => {
         break;
       }
       case 'snap': {
+        // Cobrir a carta da mesa com uma carta igual da própria mão
         if (room.phase !== 'play') return;
         if (idx === room.gringoBy) return err('Disseste Gringo: as tuas cartas estão bloqueadas.');
-        if (!room.snapOpen || !room.discard.length) return err('Tarde demais — já não dá para jogar carta igual.');
+        if (!room.snapOpen || !room.discard.length) return err('Ainda não há carta na mesa para cobrir.');
         if (!validSlot(a.slot)) return;
         const top = room.discard[room.discard.length - 1];
         const c = p.hand[a.slot];
-        if (c.rank === top.rank) {
-          room.discard.push(c);
-          p.hand[a.slot] = null;
-          room.snapOpen = false; // só passam duas cartas iguais por jogada
-          event(room, 'snap', `${p.name} foi rápido e jogou ${cardText(c)}!`, [], idx);
-          if (cardsLeft(p) === 0 && room.gringoBy === null) declareGringo(room, idx, true);
-        } else {
-          const pen = drawFromDeck(room);
-          let cell = null;
-          if (pen) {
-            const empty = p.hand.indexOf(null);
-            const s = empty >= 0 ? empty : p.hand.length;
-            p.hand[s] = pen;
-            cell = { p: idx, s };
-          }
+        if (c.rank !== top.rank) {
+          const cell = penalize(room, idx);
           event(room, 'fail', `${p.name} enganou-se (mostrou ${cardText(c)}, não é ${top.rank}) e apanha uma carta sem ver.`,
             [{ p: idx, s: a.slot }].concat(cell ? [cell] : []), idx);
+        } else if (coverClosed(room)) {
+          const cell = penalize(room, idx);
+          event(room, 'fail', `${p.name} chegou tarde: o ${top.rank} já tinha sido coberto. Fica com o ${cardText(c)} e apanha uma carta sem ver.`,
+            [{ p: idx, s: a.slot }].concat(cell ? [cell] : []), idx);
+        } else {
+          room.discard.push(c);
+          p.hand[a.slot] = null;
+          room.covers++;
+          event(room, 'snap', `${p.name} cobriu com ${cardText(c)}!`, [], idx);
+          if (cardsLeft(p) === 0 && room.gringoBy === null) declareGringo(room, idx, true);
         }
+        break;
+      }
+      case 'snapOther': {
+        // Cobrir a carta da mesa com uma carta igual de OUTRO jogador e dar-lhe uma carta nossa
+        if (room.phase !== 'play') return;
+        if (idx === room.gringoBy) return err('Disseste Gringo: as tuas cartas estão bloqueadas.');
+        if (!room.snapOpen || !room.discard.length) return err('Ainda não há carta na mesa para cobrir.');
+        if (!validTarget(room, idx, a.tp, a.ts)) return err('Não podes usar essa carta.');
+        const hasCards = cardsLeft(p) > 0;
+        if (hasCards && !validSlot(a.slot)) return err('Escolhe a carta tua que lhe vais dar.');
+        const t = room.players[a.tp];
+        const top = room.discard[room.discard.length - 1];
+        const c = t.hand[a.ts];
+        if (c.rank !== top.rank) {
+          const cell = penalize(room, idx);
+          event(room, 'fail', `${p.name} tentou cobrir com uma carta de ${t.name}, mas era ${cardText(c)}. Apanha uma carta sem ver.`,
+            [{ p: a.tp, s: a.ts }].concat(cell ? [cell] : []), idx);
+        } else if (coverClosed(room)) {
+          const cell = penalize(room, idx);
+          event(room, 'fail', `${p.name} chegou tarde: o ${top.rank} já tinha sido coberto. Apanha uma carta sem ver.`,
+            [{ p: a.tp, s: a.ts }].concat(cell ? [cell] : []), idx);
+        } else {
+          room.discard.push(c);
+          room.covers++;
+          if (hasCards) {
+            t.hand[a.ts] = p.hand[a.slot];
+            p.hand[a.slot] = null;
+          } else {
+            t.hand[a.ts] = null;
+          }
+          event(room, 'steal', `${p.name} cobriu com o ${cardText(c)} de ${t.name}` +
+            (hasCards ? ' e deu-lhe uma carta sua!' : '!'), [{ p: a.tp, s: a.ts }], idx);
+          if (cardsLeft(p) === 0 && room.gringoBy === null) declareGringo(room, idx, true);
+          else if (cardsLeft(t) === 0 && room.gringoBy === null) declareGringo(room, a.tp, true);
+        }
+        break;
+      }
+      case 'setOption': {
+        if (!isHost || (room.phase !== 'lobby' && room.phase !== 'end')) return;
+        if (!['multiCover', 'autoImmediate'].includes(a.key)) return;
+        room.options[a.key] = !!a.value;
+        const txt = {
+          multiCover: room.options.multiCover ? 'pode-se cobrir a mesma carta várias vezes' : 'só se pode cobrir uma vez (quem chega tarde é penalizado)',
+          autoImmediate: room.options.autoImmediate ? 'quem fica sem cartas acaba logo a ronda' : 'quando alguém fica sem cartas, os outros jogam mais uma vez',
+        }[a.key];
+        event(room, 'info', `Regra alterada: ${txt}.`, [], idx);
         break;
       }
 
