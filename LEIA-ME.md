@@ -35,6 +35,10 @@ No plano gratuito, o servidor adormece quando não é usado e pode demorar cerca
 - Cada jogador recebe 4 cartas viradas para baixo e escolhe 2 para ver e memorizar.
 - Na sua vez, tira uma carta do baralho (só ele a vê) e troca-a por uma das suas ou joga-a na mesa.
 - Quando é jogada uma carta na mesa, qualquer jogador com uma carta do mesmo valor pode clicar nela para a jogar. Só uma pessoa consegue por jogada, por isso só passam duas cartas iguais. Se te enganares, a carta é mostrada e apanhas uma carta do baralho sem a ver.
+- **Par**: se tiras uma carta e sabes que tens outra igual, podes jogar as duas. Se te enganares, apanhas uma carta sem ver.
+- **Dama (Q)**: se a tiras e a jogas na mesa, podes ver uma das tuas cartas.
+- **Valete (J)**: se o tiras e o jogas na mesa, trocas uma carta tua com uma de outro jogador, sem ninguém ver.
+- **Rei (K)**: se o tiras e o jogas na mesa, vês uma carta de outro jogador e decides se a trocas por uma tua.
 - **Gringo**: na tua vez, em vez de tirar carta. As tuas cartas ficam bloqueadas, os outros jogam mais uma vez e mostram-se todas as cartas.
 - **Autogringo**: acontece automaticamente quando ficas sem cartas.
 - Valores: A = 1, 2–10 = o próprio número, J e Q = 10, K♥ e K♦ = −3, K♠ e K♣ = 10.
