@@ -11,6 +11,8 @@ let joined = null;     // { code, name }
 let peekSel = [];      // cartas escolhidas na fase de memorizar
 let mode = null;       // null | 'double' | 'snap'  (depois de tirar carta)
 let jSel = { mine: null, other: null }; // seleção do poder do Valete
+let coverSel = null;   // carta de outro jogador escolhida para cobrir a mesa
+let coverKey = '';
 let lastFxId = 0;
 let lastPendingKey = '';
 let resultsShownRound = 0;
@@ -19,7 +21,7 @@ const COLORS = ['#e8b64c', '#4aa8ff', '#3ddc84', '#ff8a8d', '#b892ff', '#ffa14a'
 const avatarColor = (i) => COLORS[i % COLORS.length];
 const LOG_ICON = {
   join: '👋', leave: '🚪', start: '🃏', turn: '▶️', draw: '🂠', swap: '🔁', discard: '⬇️', double: '🃏',
-  snap: '⚡', fail: '❌', gringo: '📣', auto: '🏁', power: '✨', peek: '👁', jswap: '🔀', kswap: '👑',
+  snap: '⚡', steal: '🎯', fail: '❌', gringo: '📣', auto: '🏁', power: '✨', peek: '👁', jswap: '🔀', kswap: '👑',
   end: '🏆', info: 'ℹ️',
 };
 const POWER_NAME = { Q: 'Dama', J: 'Valete', K: 'Rei' };
@@ -191,6 +193,9 @@ const isRed = (c) => c.suit === '♥' || c.suit === '♦';
 const myTurn = () => S && S.phase === 'play' && S.turn === S.me;
 const myPending = () => S && S.pending && S.pending.player === S.me;
 const visibleCount = (hand) => hand.filter((c) => c && !c.hidden).length;
+// Pode-se cobrir a carta da mesa neste momento?
+const canCover = () => S && S.phase === 'play' && S.snapOpen && S.discardTop && S.gringoBy !== S.me && !myPending();
+const coverClosed = () => S && !S.options.multiCover && S.covers >= 1;
 
 function cardEl(c, size = '', p, s) {
   const d = el('div', 'card ' + size);
@@ -225,6 +230,9 @@ function onStateChange() {
   if (!(myTurn() && s.drawn && !s.pending)) mode = null;
   if (mode === 'snap' && !s.snapOpen) mode = null;
   if (s.phase !== 'peek') peekSel = [];
+  const ck = s.discardTop ? s.discardTop.rank + s.discardTop.suit + s.discardCount : '';
+  if (ck !== coverKey || !canCover()) coverSel = null;
+  coverKey = ck;
 
   const wasMyTurn = prevS && prevS.phase === 'play' && prevS.turn === prevS.me;
   if (myTurn() && !wasMyTurn) {
@@ -275,6 +283,13 @@ function applyFx() {
       Sound.play('good');
       if (discard) { anim('fx-land', [discard]); setTimeout(() => anim('fx-good', [discard]), 50); }
       toast(fx.text, 'success', fx.kind === 'snap' ? '⚡' : '🃏');
+      break;
+    case 'steal':
+      Sound.play('good');
+      if (discard) { anim('fx-land', [discard]); setTimeout(() => anim('fx-good', [discard]), 50); }
+      anim('fx-swap', cellEls);
+      if (!mine && involvesMe) toast(`${S.players[fx.actor].name} cobriu com uma carta tua e deu-te outra em troca!`, 'power', '🎯');
+      else toast(fx.text, 'success', '🎯');
       break;
     case 'fail':
       Sound.play('bad');
@@ -374,6 +389,7 @@ function renderLobby() {
   });
   for (let k = s.players.length; k < 6; k++) list.appendChild(el('div', 'lobby-empty', 'lugar livre'));
   p.appendChild(list);
+  p.appendChild(optionsBox());
   if (s.isHost) {
     const b = btn(s.players.length < 2 ? 'À espera de mais jogadores…' : `Começar jogo (${s.players.length} jogadores)`,
       () => act('start'), 'primary lg', s.players.length < 2);
@@ -381,6 +397,28 @@ function renderLobby() {
   } else {
     p.appendChild(el('p', '', '⏳ À espera que o anfitrião comece o jogo…'));
   }
+}
+
+function optionsBox() {
+  const s = S;
+  const box = el('div', 'options');
+  box.appendChild(el('div', 'options-title', 'Regras da sala' + (s.isHost ? '' : ' (escolhidas pelo anfitrião)')));
+  const opts = [
+    ['multiCover', 'Pode-se cobrir a mesma carta várias vezes', 'Desligado: só o primeiro a cobrir conta; quem cobre depois volta a ficar com a carta e apanha mais uma.'],
+    ['autoImmediate', 'Quem fica sem cartas acaba logo a ronda', 'Desligado: os outros ainda jogam mais uma vez, como no Gringo.'],
+  ];
+  opts.forEach(([key, label, help]) => {
+    const row = el('label', 'opt' + (s.isHost ? '' : ' ro'));
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.checked = !!s.options[key];
+    cb.disabled = !s.isHost;
+    cb.onchange = () => act('setOption', { key, value: cb.checked });
+    row.appendChild(cb);
+    row.appendChild(el('span', '', `<b>${label}</b><small>${help}</small>`));
+    box.appendChild(row);
+  });
+  return box;
 }
 
 function renderOpponents() {
@@ -418,6 +456,17 @@ function renderOpponents() {
     p.hand.forEach((c, si) => {
       const ce = cardEl(c, '', i, si);
       if (c && s.gringoBy === i) ce.classList.add('locked');
+      if (c && !targeting && canCover() && i !== s.gringoBy) {
+        ce.classList.add('clickable', 'c-snap');
+        ce.title = `Cobrir a mesa com esta carta (se for ${s.discardTop.rank})`;
+        if (coverSel && coverSel.p === i && coverSel.s === si) ce.classList.add('selected');
+        ce.onclick = () => {
+          Sound.play('click');
+          if (!s.players[s.me].hand.some(Boolean)) { act('snapOther', { tp: i, ts: si, slot: null }); return; }
+          coverSel = coverSel && coverSel.p === i && coverSel.s === si ? null : { p: i, s: si };
+          render();
+        };
+      }
       if (c && targeting && i !== s.gringoBy) {
         ce.classList.add('clickable', 'c-power');
         if (pend.type === 'J') {
@@ -509,6 +558,12 @@ function renderMySeat() {
         if (peekSel.length === 2) socket.emit('action', { type: 'peek', slots: peekSel });
         render();
       });
+    } else if (coverSel && canCover()) {
+      click('c-snap', 'Dar esta carta em troca', () => {
+        const cs = coverSel;
+        coverSel = null;
+        act('snapOther', { tp: cs.p, ts: cs.s, slot: i });
+      });
     } else if (myPending()) {
       if (pend.type === 'Q' && pend.stage === 'pick') click('c-power', 'Ver esta carta', () => act('qPeek', { slot: i }));
       if (pend.type === 'J') {
@@ -534,7 +589,9 @@ function renderMySeat() {
   if (s.phase === 'peek' && !me.ready && visibleCount(me.hand) === 2) {
     a.appendChild(btn('✓ Pronto, já memorizei', () => act('ready'), 'primary lg'));
   }
-  if (s.phase === 'play') {
+  if (coverSel && canCover()) {
+    a.appendChild(btn('✕ Cancelar', () => { coverSel = null; render(); }, 'secondary'));
+  } else if (s.phase === 'play') {
     if (myPending()) {
       if (pend.type === 'Q' && pend.stage === 'pick') a.appendChild(btn('Não usar o poder', () => act('powerDone')));
       if (pend.type === 'Q' && pend.stage === 'seen') a.appendChild(btn('✓ Feito, já memorizei', () => act('powerDone'), 'primary'));
@@ -575,8 +632,12 @@ function renderPrompt() {
   const me = s.players[s.me];
   const pend = s.pending;
   const turnName = s.players[s.turn] ? esc(s.players[s.turn].name) : '';
-  const snapHint = s.snapOpen && s.discardTop && s.gringoBy !== s.me
-    ? `<span class="hint">⚡ Tens um <b>${s.discardTop.rank}</b>? Clica nele rápido para o jogar!</span>` : '';
+  let snapHint = '';
+  if (s.phase === 'play' && s.snapOpen && s.discardTop && s.gringoBy !== s.me) {
+    snapHint = coverClosed()
+      ? `<span class="hint">🔒 O <b>${s.discardTop.rank}</b> já foi coberto — quem cobrir agora é penalizado.</span>`
+      : `<span class="hint">⚡ Tens um <b>${s.discardTop.rank}</b>, ou sabes quem tem? Clica nessa carta rápido para cobrir!</span>`;
+  }
 
   if (s.phase === 'lobby') {
     icon = '👥';
@@ -586,6 +647,9 @@ function renderPrompt() {
     if (me.ready) { icon = '⏳'; html = 'À espera que os outros memorizem as cartas…'; }
     else if (seen === 2) { icon = '🧠'; cls = 'warn'; html = '<b>Memoriza bem estas 2 cartas!</b> Quando estiveres pronto, carrega em <b>Pronto</b>.<span class="hint">Depois disso deixas de as ver.</span>'; }
     else { icon = '👀'; cls = 'turn'; html = `Escolhe <b>2 das tuas cartas</b> para veres (${peekSel.length}/2).`; }
+  } else if (s.phase === 'play' && coverSel && canCover()) {
+    icon = '🎯'; cls = 'warn';
+    html = `Vais cobrir o <b>${s.discardTop.rank}</b> com a carta de <b>${esc(s.players[coverSel.p].name)}</b>. Agora clica na carta <b>tua</b> que lhe vais dar.<span class="hint">Se a carta dele não for ${s.discardTop.rank}, apanhas uma carta sem ver.</span>`;
   } else if (s.phase === 'play') {
     if (myPending()) {
       cls = 'power';
